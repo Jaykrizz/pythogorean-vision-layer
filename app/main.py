@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 
 from .cards import (
     SUPPORTED_DICTIONARIES,
@@ -7,6 +7,7 @@ from .cards import (
     render_card,
 )
 from .config import settings
+from .detect import detect_answers
 
 app = FastAPI(title="Pythogorean Vision Layer", version="0.1.0")
 
@@ -42,3 +43,22 @@ def get_card(
         raise HTTPException(status_code=400, detail=str(error))
 
     return Response(content=png, media_type="image/png")
+
+
+@app.post("/detect")
+async def detect(
+    image: UploadFile = File(...),
+    dictionary: str = Query(default=None),
+):
+    data = await image.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Image is empty")
+
+    try:
+        answers = detect_answers(data, dictionary or settings.dictionary)
+    except UnknownDictionaryError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    return {"answers": answers}
